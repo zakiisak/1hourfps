@@ -22,27 +22,29 @@ public class MainController : MonoBehaviour
         BroadcastNetwork.StartReceiver(ReceivePacket);
     }
 
-    private int lastAmountOfPlayers = 0;
+    private int lastAmountOfPlayers = -1;
 
     // Update is called once per frame
     void Update()
     {
         BroadcastNetwork.Update();
 
-        lastAmountOfPlayers = PlayerController.Players.Count;
+        UpdatePlayerText();
     }
 
     private void UpdatePlayerText()
     {
         if(lastAmountOfPlayers != PlayerController.Players.Count)
         {
-            string text = "Players: " + PlayerController.Players.Count + " (" + PlayerController.Instance.Name + " ";
+            string text = "Players: " + (PlayerController.Players.Count + 1 /*plus us the local player*/) + " ( " + PlayerController.Instance.Name + " ";
 
             foreach(PlayerController player in PlayerController.Players.Values)
             {
                 text += player.Name + " ";
             }
-            PlayerCountText.GetComponent<TextMeshProUGUI>().text = text; 
+            text += ")";
+            PlayerCountText.GetComponent<TextMeshProUGUI>().text = text;
+            lastAmountOfPlayers = PlayerController.Players.Count;
         }    
     }
 

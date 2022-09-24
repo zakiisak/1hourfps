@@ -13,7 +13,7 @@ public class PlayerController : MonoBehaviour
 
 
     private Camera camera;
-    private float MovementSpeed = 10.0f;
+    private float MovementSpeed = 500.0f;
     private float RotationSpeed = 2.0f;
     private float JumpSpeed = 2.0f;
 
@@ -28,11 +28,8 @@ public class PlayerController : MonoBehaviour
     private MeshRenderer renderer;
 
     public bool Dead { get; private set; } = false;
-
     private float lastUpdated;
-
     private float timeToRespawn;
-
     private GameObject playerNameObj;
 
     public void InitFromPacket(PacketPlayer packet)
@@ -49,6 +46,7 @@ public class PlayerController : MonoBehaviour
 
     public void UpdateFromPacket(PacketPlayer packet)
     {
+        Debug.Log("Updating from packet");
         lastUpdated = Time.time;
         this.transform.position = packet.Position;
         this.transform.rotation = packet.Rotation;
@@ -187,24 +185,63 @@ public class PlayerController : MonoBehaviour
 
     private void Respawn()
     {
+        if (body != null)
+            body.velocity = Vector3.zero;
+        airMovement = Vector3.zero;
         if(Remote == false)
             transform.position = new Vector3(-24f + (float)rng.NextDouble() * 50f, 10, -24f + (float)rng.NextDouble() * 50f);
         Dead = false;
     }
+
+    private Vector3 airMovement = new Vector3();
 
     private void UpdateMovement()
     {
         float y = Input.GetAxis("Vertical");
         float x = Input.GetAxis("Horizontal");
 
+        if(collisions > 0)
+        {
+            airMovement *= 0.75f;
+        }
+
+        float dot = Vector3.Dot(body.velocity.normalized, (camera.transform.right * x).normalized);
+        float dotFactor = 1.0f - Mathf.Abs(dot);
+        if(dot < 0)
+        {
+            dotFactor *= 1.0f - Mathf.Abs(dot);
+        }
+
 
         if (Mathf.Abs(x) < 0.25f) x = 0;
-        else x *= MovementSpeed;
         if (Mathf.Abs(y) < 0.25f) y = 0;
-        else y *= MovementSpeed;
+        Debug.Log(x + ", " + y);
 
-        Vector3 movement = camera.transform.TransformDirection(new Vector3(x, 0, y));
-        body.velocity = new Vector3(movement.x, body.velocity.y, movement.z);
+        Vector3 forward = Vector3.ProjectOnPlane(camera.transform.forward, Vector3.up).normalized;
+        Debug.Log("Forward: " + forward);
+        Vector3 movement = forward * (MovementSpeed * Time.deltaTime * y) + 
+            camera.transform.right * (MovementSpeed * Time.deltaTime * x);
+
+        if (collisions <= 0)
+        {
+            const float maxVelocity = 100f;
+            airMovement += transform.right * (x * MovementSpeed * Time.deltaTime * dotFactor * 0.3f);
+            Debug.Log("Air Movement Length: " + airMovement.magnitude);
+
+            if(airMovement.magnitude > maxVelocity)
+            {
+                airMovement = airMovement.normalized * maxVelocity;
+            }
+            
+        }
+
+        float rightDot = Vector3.Dot(airMovement.normalized, camera.transform.right);
+        if(rightDot < 0)
+        {
+            airMovement *= 1.0f - Mathf.Abs(rightDot);
+        }
+
+        body.velocity = new Vector3(movement.x + airMovement.x, body.velocity.y, movement.z + airMovement.z);
         camera.transform.position = transform.position;
 
         if(Input.GetKey(KeyCode.Space))
@@ -245,6 +282,6 @@ public class PlayerController : MonoBehaviour
         rotation.y += h;
 
         camera.transform.rotation = Quaternion.Euler(rotation);
-        transform.rotation = camera.transform.rotation;
+        //transform.rotation = camera.transform.rotation;
     }
 }
